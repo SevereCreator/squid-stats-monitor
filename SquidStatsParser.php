@@ -1,13 +1,8 @@
 <?php
-/**
- * SquidStatsParser.php
- * Модуль парсинга логов прокси-сервера Squid
- *
- * Часть системы: Squid Stats Monitor
- * Репозиторий: https://github.com/SevereCreator/squid-stats-monitor
- */
+// SquidStatsParser.php — парсинг логов прокси-сервера Squid
+// Репозиторий: https://github.com/SevereCreator/squid-stats-monitor
 
-require_once __DIR__ . '/Logger.php'; // [LOGGING]
+require_once __DIR__ . '/Logger.php';
 
 class SquidStatsParser {
 
@@ -15,61 +10,47 @@ class SquidStatsParser {
     private $cacheFile;
     private $cacheLifetime = 60; // секунды
 
-    /**
-     * Конструктор класса
-     * @param string $logFile Путь к файлу логов Squid
-     */
+    // $logFile — путь к файлу логов Squid
     public function __construct($logFile = '/var/log/squid/access.log') {
         $this->logFile = $logFile;
         $this->cacheFile = sys_get_temp_dir() . '/squid_stats_cache.json';
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Публичные методы
-    // ─────────────────────────────────────────────────────────────────────
-
-    /**
-     * Получить статистику (с кэшированием)
-     * @param bool $forceRefresh Принудительное обновление кэша
-     * @return array
-     */
+    // Возвращает статистику. Если кэш свежий — отдаёт его, иначе парсит заново.
+    // $forceRefresh = true принудительно сбрасывает кэш
     public function getStats($forceRefresh = false) {
-        $log = Logger::getInstance(); // [LOGGING]
+        $log = Logger::getInstance();
 
         // Проверка наличия и актуальности кэша
         if (!$forceRefresh && file_exists($this->cacheFile)) {
             $cacheTime   = filemtime($this->cacheFile);
             $currentTime = time();
             if ($currentTime - $cacheTime < $this->cacheLifetime) {
-                $log->info('Статистика возвращена из кэша', [ // [LOGGING]
-                    'cacheAge'  => $currentTime - $cacheTime, // [LOGGING]
-                    'cacheFile' => $this->cacheFile, // [LOGGING]
-                ]); // [LOGGING]
+                $log->info('Статистика возвращена из кэша', [
+                    'cacheAge'  => $currentTime - $cacheTime,
+                    'cacheFile' => $this->cacheFile,
+                ]);
                 $cachedData = file_get_contents($this->cacheFile);
                 return json_decode($cachedData, true);
             }
         }
 
-        $log->info('Кэш устарел или сброшен, запускаем парсинг', [ // [LOGGING]
-            'forceRefresh' => $forceRefresh, // [LOGGING]
-            'logFile'      => $this->logFile, // [LOGGING]
-        ]); // [LOGGING]
+        $log->info('Кэш устарел или сброшен, запускаем парсинг', [
+            'forceRefresh' => $forceRefresh,
+            'logFile'      => $this->logFile,
+        ]);
 
         // Парсинг логов
         $stats = $this->parseLogFile();
 
         // Сохранение в кэш
         file_put_contents($this->cacheFile, json_encode($stats));
-        $log->info('Кэш обновлён', ['cacheFile' => $this->cacheFile]); // [LOGGING]
+        $log->info('Кэш обновлён', ['cacheFile' => $this->cacheFile]);
 
         return $stats;
     }
 
-    /**
-     * Форматировать байты в читаемый вид
-     * @param int $bytes
-     * @return string
-     */
+    // Переводит байты в читаемый вид: 1024 → "1 KB"
     public static function formatBytes($bytes) {
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         for ($i = 0; $bytes >= 1024 && $i < count($units) - 1; $i++) {
@@ -78,10 +59,7 @@ class SquidStatsParser {
         return round($bytes, 2) . ' ' . $units[$i];
     }
 
-    /**
-     * Проверить, устарел ли кэш
-     * @return bool
-     */
+    // Возвращает true, если кэш устарел или его нет
     public function isExpired() {
         if (!file_exists($this->cacheFile)) {
             return true;
@@ -89,66 +67,54 @@ class SquidStatsParser {
         return (time() - filemtime($this->cacheFile)) >= $this->cacheLifetime;
     }
 
-    /**
-     * Установить время жизни кэша
-     * @param int $seconds
-     */
+    // Задаёт время жизни кэша в секундах
     public function setCacheLifetime($seconds) {
         $this->cacheLifetime = (int)$seconds;
-        Logger::getInstance()->debug('Установлено время жизни кэша', ['seconds' => $seconds]); // [LOGGING]
+        Logger::getInstance()->debug('Установлено время жизни кэша', ['seconds' => $seconds]);
     }
 
-    /**
-     * Принудительно очистить кэш
-     */
+    // Удаляет файл кэша вручную
     public function clearCache() {
-        $log = Logger::getInstance(); // [LOGGING]
+        $log = Logger::getInstance();
         if (file_exists($this->cacheFile)) {
             unlink($this->cacheFile);
-            $log->info('Кэш принудительно очищен', ['cacheFile' => $this->cacheFile]); // [LOGGING]
+            $log->info('Кэш принудительно очищен', ['cacheFile' => $this->cacheFile]);
         } else {
-            $log->debug('clearCache вызван, но файл кэша не существует'); // [LOGGING]
+            $log->debug('clearCache вызван, но файл кэша не существует');
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Приватные методы
-    // ─────────────────────────────────────────────────────────────────────
-
-    /**
-     * Основной метод парсинга лог-файла
-     * @return array
-     */
+    // Читает лог, агрегирует данные по клиентам и возвращает итоговый массив
     private function parseLogFile() {
-        $log = Logger::getInstance(); // [LOGGING]
+        $log = Logger::getInstance();
 
         if (!file_exists($this->logFile)) {
-            $log->error('Лог-файл не найден', ['path' => $this->logFile]); // [LOGGING]
+            $log->error('Лог-файл не найден', ['path' => $this->logFile]);
             throw new Exception("Log file not found: {$this->logFile}");
         }
         if (!is_readable($this->logFile)) {
-            $log->error('Лог-файл недоступен для чтения', ['path' => $this->logFile]); // [LOGGING]
+            $log->error('Лог-файл недоступен для чтения', ['path' => $this->logFile]);
             throw new Exception("Log file is not readable: {$this->logFile}");
         }
 
         // Читаем последние 10 000 строк (оптимизация для больших логов)
         $lines = $this->tailFile($this->logFile, 10000);
-        $log->info('Прочитаны строки из лог-файла', [ // [LOGGING]
-            'path'  => $this->logFile, // [LOGGING]
-            'count' => count($lines), // [LOGGING]
-        ]); // [LOGGING]
+        $log->info('Прочитаны строки из лог-файла', [
+            'path'  => $this->logFile,
+            'count' => count($lines),
+        ]);
 
         // Структуры для агрегации
         $clients       = [];
         $totalTraffic  = 0;
         $totalRequests = 0;
-        $skippedLines  = 0; // [LOGGING]
+        $skippedLines  = 0;
         $hitCodes      = ['TCP_HIT', 'TCP_MEM_HIT', 'TCP_REFRESH_HIT', 'TCP_IMS_HIT'];
 
         foreach ($lines as $line) {
             $parsed = $this->parseLogLine($line);
             if (!$parsed) {
-                $skippedLines++; // [LOGGING]
+                $skippedLines++;
                 continue;
             }
 
@@ -188,13 +154,13 @@ class SquidStatsParser {
             $totalRequests++;
         }
 
-        $log->info('Парсинг завершён', [ // [LOGGING]
-            'totalLines'    => count($lines), // [LOGGING]
-            'parsedLines'   => $totalRequests, // [LOGGING]
-            'skippedLines'  => $skippedLines, // [LOGGING]
-            'uniqueClients' => count($clients), // [LOGGING]
-            'totalTraffic'  => $totalTraffic, // [LOGGING]
-        ]); // [LOGGING]
+        $log->info('Парсинг завершён', [
+            'totalLines'    => count($lines),
+            'parsedLines'   => $totalRequests,
+            'skippedLines'  => $skippedLines,
+            'uniqueClients' => count($clients),
+            'totalTraffic'  => $totalTraffic,
+        ]);
 
         // Финальная обработка: вычисление производных метрик
         $clientsArray = [];
@@ -226,11 +192,11 @@ class SquidStatsParser {
             ? round(($totalHits / $totalRequests) * 100, 2)
             : 0;
 
-        $log->info('Итоговая статистика сформирована', [ // [LOGGING]
-            'activeClients' => count($clientsArray), // [LOGGING]
-            'totalRequests' => $totalRequests, // [LOGGING]
-            'totalHitRate'  => $totalHitRate, // [LOGGING]
-        ]); // [LOGGING]
+        $log->info('Итоговая статистика сформирована', [
+            'activeClients' => count($clientsArray),
+            'totalRequests' => $totalRequests,
+            'totalHitRate'  => $totalHitRate,
+        ]);
 
         return [
             'totalTraffic'  => (int)$totalTraffic,
@@ -242,13 +208,9 @@ class SquidStatsParser {
         ];
     }
 
-    /**
-     * Разобрать одну строку лог-файла Squid
-     * Формат: timestamp elapsed client_ip result/status bytes method url user hier/peer content_type
-     *
-     * @param string $line
-     * @return array|null
-     */
+    // Разбирает одну строку лога Squid.
+    // Формат: timestamp elapsed client_ip result/status bytes method url user hier/peer content_type
+    // Возвращает массив полей или null, если строка кривая
     private function parseLogLine($line) {
         $line = trim($line);
         if (empty($line)) {
@@ -260,10 +222,10 @@ class SquidStatsParser {
 
         // Валидация: минимум 10 полей
         if (count($parts) < 10) {
-            Logger::getInstance()->debug('Строка пропущена: недостаточно полей', [ // [LOGGING]
-                'fields'  => count($parts), // [LOGGING]
-                'preview' => mb_substr($line, 0, 80), // [LOGGING]
-            ]); // [LOGGING]
+            Logger::getInstance()->debug('Строка пропущена: недостаточно полей', [
+                'fields'  => count($parts),
+                'preview' => mb_substr($line, 0, 80),
+            ]);
             return null;
         }
 
@@ -283,24 +245,18 @@ class SquidStatsParser {
         ];
     }
 
-    /**
-     * Эффективное чтение последних N строк файла (аналог unix tail)
-     * Не загружает весь файл в память — O(N) по памяти.
-     *
-     * @param string $file   Путь к файлу
-     * @param int    $lines  Количество строк
-     * @return array
-     */
+    // Читает последние N строк файла без загрузки всего файла в память.
+    // Работает как unix-команда tail — идёт с конца файла
     private function tailFile($file, $lines = 1000) {
-        $log = Logger::getInstance(); // [LOGGING]
+        $log = Logger::getInstance();
 
         $handle = fopen($file, 'r');
         if (!$handle) {
-            $log->error('Не удалось открыть лог-файл для чтения (tailFile)', ['file' => $file]); // [LOGGING]
+            $log->error('Не удалось открыть лог-файл для чтения (tailFile)', ['file' => $file]);
             return [];
         }
 
-        $log->debug('tailFile: начало чтения файла', ['file' => $file, 'requestedLines' => $lines]); // [LOGGING]
+        $log->debug('tailFile: начало чтения файла', ['file' => $file, 'requestedLines' => $lines]);
 
         $linecounter = $lines;
         $pos         = -2;          // начинаем с предпоследнего символа
@@ -337,7 +293,7 @@ class SquidStatsParser {
 
         // Переворачиваем — читали с конца
         $result = array_reverse($text);
-        $log->debug('tailFile: чтение завершено', ['returnedLines' => count($result)]); // [LOGGING]
+        $log->debug('tailFile: чтение завершено', ['returnedLines' => count($result)]);
 
         return $result;
     }

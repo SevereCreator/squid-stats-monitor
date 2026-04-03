@@ -262,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── Загрузка данных (AJAX) ──────────────────────────────────────────────────
 function loadStats(force = false) {
     const url = force ? 'api.php?refresh=true' : 'api.php';
-    console.info(`[SquidStats] loadStats — url: ${url}, force: ${force}`); // [LOGGING]
+    console.info(`[SquidStats] loadStats — url: ${url}, force: ${force}`);
 
     // Анимация кнопки обновить
     document.getElementById('refreshIcon').classList.add('fa-spin');
@@ -275,18 +275,17 @@ function loadStats(force = false) {
             return response.json();
         })
         .then(data => {
-            console.info('[SquidStats] Данные получены', { // [LOGGING]
-                clients:  data.activeClients, // [LOGGING]
-                requests: data.totalRequests, // [LOGGING]
-                hitRate:  data.totalHitRate,  // [LOGGING]
-                cached:   data._meta?.cached, // [LOGGING]
-            }); // [LOGGING]
+            console.info('[SquidStats] Данные получены', {
+                clients:  data.activeClients,
+                requests: data.totalRequests,
+                hitRate:  data.totalHitRate,
+                cached:   data._meta?.cached,
+            });
             statsData = data;
             updateUI();
         })
         .catch(error => {
-            console.error('[SquidStats] Load error:', error);
-            console.error('[SquidStats] Ошибка загрузки данных:', error.message); // [LOGGING]
+            console.error('[SquidStats] Ошибка загрузки данных:', error.message);
             showError(error.message);
         })
         .finally(() => {
@@ -295,7 +294,7 @@ function loadStats(force = false) {
 }
 
 function refreshStats() {
-    console.info('[SquidStats] Принудительное обновление'); // [LOGGING]
+    console.info('[SquidStats] Принудительное обновление');
     loadStats(true);
     resetCountdown();
 }
@@ -410,7 +409,7 @@ function sortTable(key) {
         sortConfig.key = key;
         sortConfig.direction = 'desc';
     }
-    console.debug(`[SquidStats] Сортировка: ${sortConfig.key} ${sortConfig.direction}`); // [LOGGING]
+    console.debug(`[SquidStats] Сортировка: ${sortConfig.key} ${sortConfig.direction}`);
     updateSortIcons();
     updateTable();
 }
@@ -485,7 +484,7 @@ function updateCharts() {
 
 // ─── Переключение вида ────────────────────────────────────────────────────────
 function switchView(view) {
-    console.info(`[SquidStats] Переключение вида: ${view}`); // [LOGGING]
+    console.info(`[SquidStats] Переключение вида: ${view}`);
     currentView = view;
     const isTable = view === 'table';
 
@@ -509,7 +508,7 @@ function startAutoRefresh() {
 
 function changeInterval(value) {
     refreshInterval = parseInt(value);
-    console.info(`[SquidStats] Интервал обновления изменён: ${refreshInterval} сек`); // [LOGGING]
+    console.info(`[SquidStats] Интервал обновления изменён: ${refreshInterval} сек`);
     resetCountdown();
 }
 
@@ -532,7 +531,7 @@ function resetCountdown() {
 // ─── Экспорт в CSV ────────────────────────────────────────────────────────────
 function exportCSV() {
     if (!statsData || !statsData.clients.length) {
-        console.warn('[SquidStats] Экспорт CSV: нет данных'); // [LOGGING]
+        console.warn('[SquidStats] Экспорт CSV: нет данных');
         alert('Нет данных для экспорта');
         return;
     }
@@ -543,7 +542,7 @@ function exportCSV() {
         [c.ip, c.user, c.traffic, c.requests, c.hits.toFixed(2), c.avgTime.toFixed(0)].join(';')
     );
 
-    console.info(`[SquidStats] Экспорт CSV: ${rows.length} строк`); // [LOGGING]
+    console.info(`[SquidStats] Экспорт CSV: ${rows.length} строк`);
     const csv  = BOM + [headers.join(';'), ...rows].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');

@@ -24,8 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/SquidStatsParser.php';
 require_once __DIR__ . '/Logger.php';
 
+// На локалке реального лога нет — подставляем демо-файл
+$isLocalhost = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']);
+$demoLog     = __DIR__ . '/access.log.demo';
+$realLog     = '/var/log/squid/access.log';
+
 $config = [
-    'log_path'       => '/var/log/squid/access.log',
+    'log_path'       => ($isLocalhost && !file_exists($realLog) && file_exists($demoLog))
+                            ? $demoLog
+                            : $realLog,
     'cache_lifetime' => 60,       // секунды
     'max_lines'      => 10000,    // максимум строк для анализа
 ];
@@ -102,6 +109,7 @@ try {
         'cacheLifetime' => $config['cache_lifetime'],
         'logFile'       => basename($config['log_path']),
         'phpVersion'    => PHP_VERSION,
+        'demoMode'      => ($config['log_path'] === $demoLog),
     ];
 
     echo json_encode($stats, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

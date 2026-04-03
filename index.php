@@ -93,6 +93,13 @@
         </div>
     </div>
 
+    <!-- Плашка демо-режима (видна только на localhost с demo-логом) -->
+    <div id="demoBanner" style="display:none"
+         class="bg-amber-50 border border-amber-300 text-amber-800 rounded-xl px-5 py-3 text-sm flex items-center gap-2">
+        <i class="fas fa-flask"></i>
+        <span><strong>Демо-режим:</strong> реальный лог Squid не найден, показываются тестовые данные из <code>access.log.demo</code></span>
+    </div>
+
     <!-- ══════════════════════════════════════
          СВОДНЫЕ КАРТОЧКИ
     ══════════════════════════════════════ -->
@@ -307,6 +314,10 @@ function updateUI() {
     if (currentView === 'charts') updateCharts();
     document.getElementById('lastUpdateTime').textContent =
         'Обновлено: ' + new Date().toLocaleTimeString('ru-RU');
+
+    // Показываем плашку если API вернул демо-данные
+    const banner = document.getElementById('demoBanner');
+    if (banner) banner.style.display = statsData._meta?.demoMode ? '' : 'none';
 }
 
 function updateSummaryCards() {
